@@ -1,0 +1,314 @@
+## 1. Why do you use EKS instead of ECS?
+
+I use Amazon Web Services EKS when the project requires:
+
+* Kubernetes ecosystem and portability across cloud/on-prem
+* Helm charts, Operators, service mesh, autoscaling
+* Multi-cloud or hybrid-cloud support
+* Better control over networking and orchestration
+
+I use ECS when:
+
+* The application is simple containerized workload
+* Team wants less operational overhead
+* Tight AWS integration is enough
+* Faster deployment with lower management effort is needed
+
+So, EKS is preferred for enterprise-grade Kubernetes environments, while ECS is good for simpler AWS-native container deployments.
+
+---
+
+## 2. Have you handled cloud cost or budget management?
+
+Yes. I have worked on:
+
+* Setting up AWS Budgets and CloudWatch billing alarms
+* Using Cost Explorer for cost analysis
+* Rightsizing EC2 and RDS instances
+* Using Auto Scaling to reduce idle resources
+* Scheduling non-production resources shutdown during off-hours
+* Using Reserved Instances/Savings Plans
+* Monitoring unused EBS volumes, snapshots, Elastic IPs
+* Tagging strategy for cost allocation
+
+---
+
+## 3. Explain how you set up monitoring tools.
+
+### CloudWatch
+
+* Installed CloudWatch Agent on EC2
+* Configured CPU, memory, disk metrics
+* Created dashboards and alarms
+* Integrated SNS for alert notifications
+
+### Grafana
+
+* Connected Grafana with CloudWatch/Prometheus datasource
+* Built dashboards for infrastructure and application metrics
+* Configured alerting for thresholds
+
+### Prometheus
+
+* Used Prometheus exporters like node_exporter
+* Scraped metrics from Kubernetes/servers
+* Integrated with Grafana visualization
+
+---
+
+## 4. Bash script to check disk and CPU usage
+
+```bash
+#!/bin/bash
+
+echo "===== Disk Usage ====="
+df -h
+
+echo ""
+echo "===== CPU Usage ====="
+top -bn1 | grep "Cpu(s)"
+
+echo ""
+echo "===== Memory Usage ====="
+free -m
+```
+
+---
+
+## 5. Terraform configuration to create EC2 instance
+
+```hcl
+provider "aws" {
+  region = "ap-south-1"
+}
+
+resource "aws_instance" "web" {
+  ami           = "ami-0f58b397bc5c1f2e8"
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "Terraform-EC2"
+  }
+}
+```
+
+---
+
+## 6. What would you do if Terraform state file is corrupted?
+
+Steps:
+
+1. Restore from remote backend backup/versioning
+2. Check state locking mechanism
+3. Use `terraform refresh`
+4. Recover resources using `terraform import`
+5. Compare infra using `terraform plan`
+6. Rebuild state carefully if backup unavailable
+
+Best practice:
+
+* Use remote backend like S3 with versioning enabled
+* Enable DynamoDB locking
+
+---
+
+## 7. If infrastructure is created outside Terraform, how do you handle it?
+
+* First verify whether resource should be managed by Terraform
+* Import resource into Terraform state using:
+
+```bash
+terraform import
+```
+
+* Update Terraform code to match actual configuration
+* Run `terraform plan` to validate drift
+* Avoid manual changes going forward
+
+---
+
+## 8. How do you prevent infrastructure deletion accidentally?
+
+I use:
+
+* `termination_protection` for EC2
+* Terraform lifecycle rule:
+
+```hcl
+lifecycle {
+  prevent_destroy = true
+}
+```
+
+* IAM least privilege access
+* Approval process before production apply
+* Remote state locking
+* Separate environments/workspaces
+* Backup and snapshots before major changes
+
+---
+
+## 9. What do you do if a Jenkins pipeline fails?
+
+Steps:
+
+1. Check failed stage logs
+2. Identify whether issue is code, infra, dependency, or credentials
+3. Verify Jenkins agent availability
+4. Re-run failed stage if appropriate
+5. Rollback deployment if production impacted
+6. Inform stakeholders if needed
+7. Create RCA for repeated failures
+
+Common checks:
+
+* Git access
+* Docker build issues
+* Terraform syntax
+* Environment variables
+* Disk space on Jenkins server
+
+---
+
+## 10. Difference between CMD and RUN in Docker
+
+| RUN                         | CMD                            |
+| --------------------------- | ------------------------------ |
+| Executes during image build | Executes when container starts |
+| Used to install packages    | Used to start application      |
+| Multiple RUN allowed        | Usually one CMD                |
+| Creates image layers        | Does not create build layer    |
+
+Example:
+
+```dockerfile
+RUN apt-get update
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+---
+
+## 11. How do you set automatic trigger in Jenkins from GitHub?
+
+Steps:
+
+1. Configure GitHub webhook
+2. In Jenkins job enable:
+
+   * “GitHub hook trigger for GITScm polling”
+3. Add webhook URL in GitHub:
+
+```text
+http://jenkins-url/github-webhook/
+```
+
+4. Push code to GitHub
+5. Jenkins automatically triggers pipeline
+
+---
+
+## 12. Explain deployment strategies used in project
+
+### Blue-Green Deployment
+
+* Two identical environments
+* Switch traffic after validation
+* Easy rollback
+
+### Rolling Deployment
+
+* Deploy gradually to instances
+* No downtime
+
+### Canary Deployment
+
+* Release to small users first
+* Monitor before full rollout
+
+### Recreate Deployment
+
+* Stop old version then deploy new version
+* Used for non-critical apps
+
+---
+
+## 13. What do you do during a P1 incident?
+
+Steps:
+
+1. Acknowledge incident immediately
+2. Join bridge call/war room
+3. Analyze monitoring alerts/logs
+4. Restore service quickly
+5. Communicate status regularly
+6. Escalate to relevant teams
+7. Perform RCA after resolution
+8. Implement preventive measures
+
+Priority during P1:
+
+* Restore business service first
+* RCA later
+
+---
+
+## 14. How do you prevent two associates from running Terraform simultaneously?
+
+I use:
+
+* Remote backend with state locking
+
+Example:
+
+* S3 backend + DynamoDB lock table in AWS
+
+This prevents concurrent `terraform apply` execution.
+
+Example:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "terraform-state-bucket"
+    key            = "prod/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "terraform-lock"
+  }
+}
+```
+
+---
+
+## 15. How do you setup disaster recovery for zero-downtime application?
+
+### Architecture
+
+* Multi-AZ deployment
+* Load balancer
+* Auto Scaling groups
+* Database replication
+* Backup and snapshots
+
+### DR Strategy
+
+* Active-Active or Active-Passive setup
+* Cross-region replication
+* Route53 failover routing
+* Automated backups
+* Infrastructure as Code for quick recovery
+
+### Monitoring
+
+* Health checks
+* CloudWatch alarms
+* Automated failover testing
+
+### Database
+
+* RDS Multi-AZ / Read Replica
+* Regular restore testing
+
+### Goal
+
+* Low RTO (Recovery Time Objective)
+* Low RPO (Recovery Point Objective)
